@@ -92,15 +92,100 @@ static double
 quadtree_nearest(quadtree *q, p2 p, p2 *out, double radius) {
 	
 	if (!quadtree_is_inside(q, p, radius)) {
+		return INFINITY;
+	}
+	else if (q->children)
+	{
+		double best = quadtree_nearest(q->children + 0, p, out, radius);
+		if (best < radius) {
+			radius = best;
+		}
+		for (int i = 0; i < 4; i++) {
+			p2 candidate;
+			double dist = quadtree_nearest(q-> children + i, p, &candiate, radius);
+
+			if (dist < best) {
+				*out = candidate;
+				best = dist;
+				if (best < radius)
+				{
+					// Refine radius.
+					radius = best;
+				}
+			}
+		}
+		return best;
+	}
+	else
+	{
+		double best = INFINITY;
+		for (size_t i = 0; i < q->count; i++) {
+			double dist = p2_dist(q->points[i], p);
+			if (dist < best) {
+				*out = q->points[i];
+				best = dist;
+			}
+			}
+		return best;
+		}
 	
 	}
-	{
 
+static void
+quadtree_coalesce(quadtree *q) {
+	q->count = 0;
+	for (int i = 0; i < 4; i++) {
+		for (size_t p = 0; p < q->children[i].count; p++) {
+			q-> points[q->count++] = q->children[i].points[p];
+		}
+	}
+	free(q->children);
+	q->children = NULL;
+}
+
+static void
+quadtree_remove(quadtree *q, p2 p) {
+	if (quadtree_is_inside(q,p,0.0))
+	{
+		if (q->children)
+		{
+			size_t count = 0;
+			for (int i = 0; i < 4; i++) {
+				quadtree_remove(q->children + i, p);
+				count += q->children[i].count;
+			}
+			if (count < QUADTREE_THRESHOLD)
+			{
+				quadtree_coalesce(q);
+			}
+		}
+		else {
+			for (size_t i = 0; i < q->count; i++)
+			{
+				if (q->points[i].id == p.id) {
+					q->points[i] = q->points[--q->count];
+				}
+			}
+		}
 	}
 }
+	
+
 
 int main()
 {
+	quadtree qt = QUADTREE_INIT;
+	int count;
+	scanf("%d", &count);
+	p2 current = {0.5, 0.5, -1};
+	for (int i = 0; i < count; i++) {
+		p2 initial;
+		double max_radius = quadtree_nearest(&qt, current, &initial, 0.0);
+		total += quadtree_nearest(&qt, &current, max_radius);
+		quadtree_remove(&qt, current);
+	}
+	printf("%f\n", total);
+	quadtree_free(&qt);
     return 0;
 }
 
